@@ -375,8 +375,6 @@ function SantricityLoginTest {
 if ($esession) {
     $estatus = SantricityPassUpdate -AdminAcc $AdminAcc -AdminPass $AdminPass -UserAcc $UserAcc -UserPass $UserPass    
     if ($estatus -eq 204) {
-        $log = ((Get-Date).ToString() + ' response OK')
-        $log | Out-File -Append success.txt
         if ($ValidateNewUserPass -eq $true) {
             SantricityLoginTest -UserAcc $UserAcc -UserPass $UserPass
         }
@@ -385,8 +383,6 @@ if ($esession) {
     }
     else {
         Write-Error 'Change of password failed. Check API endpoints, accounts, passwords and reachability.'
-        $log = ((Get-Date).ToString() + ' response NG')
-        $log | Out-File -Append failure.txt    
     }
     SantricityLogout
 }
