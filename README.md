@@ -1,6 +1,6 @@
-# eseries - Various NetApp E-Series stuff
+# Various NetApp E-Series stuff
 
-## change-password.ps1 
+## change-password
 
-Use this PowerShell 7 script to set a new password for non-admin local user account on E-Series.
+change-password.ps1 - sets a new password for a local user account on NetApp E-Series (PowerShell 7)
 
