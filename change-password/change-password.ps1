@@ -217,8 +217,8 @@ Function SantricitySystemIdVerify {
     Try {
         $response = Invoke-RestMethod -Uri "$API_ENDPOINT_SYSTEM" -SkipCertificateCheck -SslProtocol @('Tls13', 'Tls12') -Method 'GET' -Headers $headers -MaximumRetryCount 1 -RetryIntervalSec 5 -WebSession $Global:esession -StatusCodeVariable estatus
         $SanSysIdReported = $response.wwn
-        Return ($SanSysIdReported)
         if ($estatus -eq 200 -and ($SanSysWwn -eq $SanSysId)) {
+            Return ($SanSysIdReported)
         }
         elseif ($estatus -eq 200 -and $response.wwn -ne $SanSysId) {
             Write-Error -ErrorId 200 -Message "SAN System ID mismatch. Please verify System ID (WWN) and try again."
