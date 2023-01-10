@@ -47,7 +47,7 @@ all:
 
 - Example playbook with E-Series modules that creates a R6 volume group using 10 drives and in it one 100Gi volume with write caching disabled:
 
-```
+```yml
 - host: eseries_arrays
   gather_facts: false # Forces Ansible not to collect facts about target nodes
   connection: local   # Forces Ansible to execute commands from the localhost
