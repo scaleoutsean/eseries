@@ -1,7 +1,7 @@
 - [EXE/Script sensor for NetApp E-Series (SANtricity) v11.80 and PRTG v20-23](#exescript-sensor-for-netapp-e-series-santricity-v1180-and-prtg-v20-23)
   - [What does this script do](#what-does-this-script-do)
   - [How to use it](#how-to-use-it)
-  - [Known shortcomings](#known-shortcomings)
+  - [Known issues and workarounds](#known-issues-and-workarounds)
   - [Metrics](#metrics)
 
 # EXE/Script sensor for NetApp E-Series (SANtricity) v11.80 and PRTG v20-23
@@ -42,7 +42,9 @@ You may hard-code JWT into the script, or pass it from PRTG and CLI (`-Token`).
 
 Some other ideas can be found [here](https://scaleoutsean.github.io/2023/09/25/monitoring-netapp-eseries-with-prtg.html#security-in-shell-scripts).
 
-## Known shortcomings
+## Known issues and workarounds 
+
+- Authentication
 
 It would be better to be able to pass username/password instead of Token, but you may edit the script on your own to do that.
 
@@ -51,6 +53,16 @@ Originally the script was like that, but removed username/password in favor of t
 However, due to a limitation in SANtricity 11.80 - JWT tokens can't be created for the monitor account - now the approach with tokens is not more secure, but is less convenient. 
 
 Ideally we'd like to use JWT for the monitor account and if that's not possible, then username/password for the monitor account.
+
+- Metrics are averaged
+
+As the API method's name says, metrics are analyzed i.e. processed on E-Series. That can be noticed when IO metrics remain stuck at 0 even after a workload has been initiated on an idle system.
+
+You need to wait around 90-120 seconds before these statistics are updated.
+
+As the way that analysis and processing is done is not documented, you can't really know how correct they are for the instant in which you get them. Generally they seem to flatten spikes. 
+
+SANtricity has other API calls that can gather live statistics for several seconds, but if metrics are gathered once every 5 minute, averaged metrics are probably more accurate than one random 10 second sample from the same period. This is why I find analyzed metrics acceptable despite their not necessarily being accurate at any point in time. 
 
 ## Metrics
 
