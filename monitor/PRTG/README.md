@@ -24,7 +24,8 @@ Copy the script to PRTG server:
 
 Create a JWT token and run the script from the CLI using your own parameters.
 
-You can get SAN WWID from SANtricity or SNMP walk:
+You can get SAN WWID from SANtricity or SNMP walk, although any WWID should do since it's not required for correct functioning of the script (it's there to make such enforcement possible).
+
 ```raw
 enterprises.789.1123.2.500.1.2.0 = STRING: "600a098000f63714000000005eaabbccc"
 ```

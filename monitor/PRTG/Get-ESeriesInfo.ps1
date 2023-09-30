@@ -159,7 +159,7 @@ $SystemName = $response.storageSystemName
                 "channel"     = "Average CPU utilization ($SystemName)";
                 "value"       = [math]::round(($response.cpuAvgUtilization), 2);
                 "unit"        = "Custom";
-                "customunit"  = "CPU";
+                "customunit"  = "%";
                 "float"       = 1;
                 "DecimalMode" = 1
             };
@@ -167,7 +167,7 @@ $SystemName = $response.storageSystemName
                 "channel"     = "Maximum CPU utilization ($SystemName)";
                 "value"       = [math]::round(($response.maxCpuUtilization), 2);
                 "unit"        = "Custom";
-                "customunit"  = "CPU";
+                "customunit"  = "%";
                 "float"       = 1;
                 "DecimalMode" = 1;
                 "ShowChart"   = 0
