@@ -30,38 +30,49 @@
 .SYNOPSIS
   Gets useful metrics from SANtricity's "analysed-system-statistics" method and sends them as JSON to PRTG.
 .DESCRIPTION
-  Script requires just one controller because it gets the metrics from the entire system.
+  This script uses just one controller because it gets the metrics from the entire system.
   It uses port 8443/TCP to access the SANtriity API.
-  Configure ping or HTTPS probe for the controllers to detect a failed controller.
-  Long-lived JWT token can be hardcoded in the script or passed from PRTG. Short-lived Beaerer Token may be passed from PRTG.
+  Configure ping or HTTPS sensor for the controllers to detect a failed controller.
+  It is recommended to use the low-priveleged SANtricity monitor account.
 .PARAMETER ApiEp
-  SANtricity API endpoint in IPv4 format. Examples: "8.4.4.3". Default: none
+  SANtricity API endpoint as IPv4 address or FQDN. Example: "8.4.4.3". Default: none
+.PARAMETER ApiPort
+  SANtricity API port. Default: 8443
 .PARAMETER SanSysId
-  SANtricity System ID. Example: "600A098000F63714000000005E79C17C". Default: "600A098000F63714000000005E79C17C"
-.PARAMETER Token
-  Short-lived Bearer token for any SANtricity account, or long-lived JWT token for an admin account. Default: none
+  SANtricity's System ID. Default: "600A098000F63714000000005E79C17C"
+.PARAMETER Account
+  Monitor account. Default: monitor
+.PARAMETER Password
+  Password for the monitor account. Default: none
 .INPUTS
   None
 .OUTPUTS 
   Stdout (JSON) for PRTG EXE/Script sensor
 .NOTES
-  Version:        1.0.0
+  Version:        1.1.0
   Author:         scaleoutSean (https://github.com/scaleoutsean)
-  Creation Date:  2023/09/30
-  Change:         Initial release
+  Creation Date:  2023/10/01
+  Change:         Change from JWT to session cookie authentication
 .EXAMPLE
-  .\Get-ESeriesInfo.ps1 -ApiEp "192.168.1.0" `
-    -SanSysId "600a098000f63714000000005e79c17c" -Token "33feq...dsA02"
+  .\Get-ESeriesInfo.ps1 -ApiEp "192.168.1.0" -ApiPort "8443" `
+    -SanSysId "600a098000f63714000000005e79c17c" `
+    -Account "monitor" -Password "monitor123"
 #>
 
-#---------------------------------------------------------[Parameters and Declarations]------------------------------------------------------
+#---------------------------------------------------------[Parameters and Declarations]------------------------------------
 
 Param (
     [Parameter(
         Mandatory = $true,
-        HelpMessage = 'SANtricity API endpoint (Controller IP) as IPv4 addresses. Example: "8.4.4.3"')]
+        HelpMessage = 'SANtricity API endpoint as IPv4 addresses or FQDN name. Example: "8.4.4.3"')]
     [ValidateNotNullOrEmpty()]
-    [array]$ApiEp,
+    [string]$ApiEp,
+
+    [Parameter(
+        Mandatory = $true,
+        HelpMessage = 'SANtricity API endpoint port. Default: 8443')]
+    [ValidateNotNullOrEmpty()]
+    [string]$ApiPort,
 
     [Parameter(
         Mandatory = $false,
@@ -72,9 +83,17 @@ Param (
 
     [Parameter(
         Mandatory = $false,
-        HelpMessage = 'Bearer Token for SANtricity account')]
+        HelpMessage = 'SANtricty monitor account. Default: monitor')]
     [ValidateNotNullOrEmpty()]
-    [string]$Token
+    [string]$Account = 'monitor',
+
+    [Parameter(
+        Mandatory = $true,
+        HelpMessage = 'SANtricty password for monitor account')]
+    [ValidateNotNullOrEmpty()]
+    [ValidateLength(8, 50)]
+    [string]$Password
+
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -82,9 +101,11 @@ $ErrorActionPreference = 'SilentlyContinue'
 $Global:headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
 $headers.Add('Accept', 'application/json')
 $headers.Add('Content-Type', 'application/json')
-$headers.Add('Authorization', "Bearer $Token")
+$Global:esession = (New-Object Microsoft.PowerShell.Commands.WebRequestSession)
 
-# SO - this section is to ignore self-signed TLS certificate if you have one
+#---------------------------------------------------------[Ignore Self-Signed TLS Certificate]-----------------------------
+
+# SO - ignore self-signed TLS certificate
 # https://stackoverflow.com/questions/36456104/invoke-restmethod-ignore-self-signed-certs
 
 if (-not("dummy" -as [type])) {
@@ -109,30 +130,86 @@ public static class Dummy {
 
 [System.Net.ServicePointManager]::ServerCertificateValidationCallback = [dummy]::GetDelegate()
 
+#---------------------------------------------------------[Ignore Self-Signed TLS Certificate]-----------------------------
+
 #---------------------------------------------------------[Functions]------------------------------------------------------
 
-# Function to return subsystem statistics for a controller 
+# Function to login to SANtricity
+Function SantricityLogin {
+    Param (
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ApiEp,
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ApiPort,
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Account,
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Password
+    
+    )
+        
+    $headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
+    $headers.Add('Accept', 'application/json')
+    $headers.Add('Content-Type', 'application/json')
+    $body = "{
+        `n  `"userId`": `"$Account`",
+        `n  `"password`": `"$Password`",
+        `n  `"xsrfProtected`": false
+        `n}"
+
+    $API_ENDPOINT_LOGIN = 'https://' + $ApiEp + ':' + $ApiPort + '/devmgr/utils/login'
+    Try {
+        $null = Invoke-RestMethod -Uri $API_ENDPOINT_LOGIN -Method 'POST' -Headers $headers -Body $body -SessionVariable Global:esession
+    }
+    Catch {
+        if ($_.ErrorDetails.Message) {
+            Write-Host $_.ErrorDetails.Message
+        }
+        else {
+            Write-Host $_
+        }
+    }
+}
+
+# Function to return system statistics from a controller 
 Function SantricityGetMetrics {
     Param (
         [Parameter(
             Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$ControllerIp,
+        [string]$ApiEp,
 
         [Parameter(
             Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$ESeriesWwid,
+        [string]$ApiPort,
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$SanSysId,
         
         [Parameter(
-            Mandatory = $false)]
+            Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$SubSystem = 'system'
+        [string]$SubSystem
     )
        
     Try {
-        $ApiEpUri = "https://" + $ControllerIp + ":8443/devmgr/v2/storage-systems/" + $ESeriesWwid + "/analysed-" + $SubSystem + "-statistics"
-        $response = Invoke-RestMethod -Uri $ApiEpUri -Method 'GET' -Headers $headers
+        $ApiEpUri = "https://" + $ApiEp + ":" + $ApiPort + "/devmgr/v2/storage-systems/" + $SanSysId + "/analysed-" + $SubSystem + "-statistics"
+        $response = Invoke-RestMethod -Uri $ApiEpUri -Method 'GET' -Headers $headers -WebSession $Global:esession
         return($response)
     }
     Catch {
@@ -147,9 +224,8 @@ Function SantricityGetMetrics {
 
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
-# https://www.paessler.com/manuals/prtg/custom_sensors#advanced_sensors
-
-$response = SantricityGetMetrics -ControllerIp $ApiEp[0] -ESeriesWwid $SanSysId -SubSystem "system"
+SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+$response = SantricityGetMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -SubSystem "system"
 $SystemName = $response.storageSystemName
 
 @{
