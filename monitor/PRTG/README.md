@@ -1,16 +1,19 @@
 - [EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80 and PRTG v20-23](#exescript-sensors-for-netapp-e-series-santricity-os-v1180-and-prtg-v20-23)
   - [What do these this script do](#what-do-these-this-script-do)
-    - [Storage System](#storage-system)
-    - [Volume](#volume)
-    - [DDP](#ddp)
+    - [Storage System (Get-ESeriesInfo.ps1)](#storage-system-get-eseriesinfops1)
+    - [Volume (Get-ESeriesVolumeInfo.ps1)](#volume-get-eseriesvolumeinfops1)
+    - [Pool (Get-ESeriesPoolInfo.ps1)](#pool-get-eseriespoolinfops1)
   - [How to use them](#how-to-use-them)
     - [Storage system sensor](#storage-system-sensor)
     - [Volume\* performance sensor](#volume-performance-sensor)
+    - [Pool sensor](#pool-sensor)
   - [Known issues and workarounds](#known-issues-and-workarounds)
     - [Encryption](#encryption)
     - [Authentication and credentials](#authentication-and-credentials)
     - [Accuracy](#accuracy)
   - [Metrics](#metrics)
+    - [System and Volumes](#system-and-volumes)
+    - [Pool](#pool)
   - [Additional information](#additional-information)
   - [Change log](#change-log)
 
@@ -34,9 +37,11 @@ Then it takes most of the metrics and sends them to stdout (and PRTG, when PRTG 
 
 It closely reflects metrics from Storage System sensor. Some metrics I don't find useful are dropped. 
 
-### DDP
+### Pool (Get-ESeriesPoolInfo.ps1)
 
-TODO
+Volumes on regular RAID disk groups usually consume the entire volume. There's no storage savings (compression, deduplication) or thin provisioning, so it's easy to reason about these.
+
+DDP, on the other hand, can accommodate volumes with heterogeneous RAID levels (RAID-1 and RAID-6, in SANtricity 11.80), so being able to see the capacity used by each, as well as other less obvious metrics without much clicking around is useful. Additionally, in SAS-based E- and EF-Series arrays, thin provisioning is possible, making this sensor even more useful. (EF300 and EF600 are NVMe-based.)
 
 ## How to use them
 
@@ -55,7 +60,7 @@ You can get SAN WWID from SANtricity or an SNMP walk, although any WWID will wor
 enterprises.789.1123.2.500.1.2.0 = STRING: "600a098000f63714000000005eaaabbb"
 ```
 
-### Storage system sensor 
+### Storage system sensor
 
 This script can be executed from PowerShell 5.1 (x86) like so:
 
@@ -77,6 +82,12 @@ Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000
 ![Configuring SANtricity volume sensor](/monitor/PRTG/prtg-script-sensor-parameters.png)
 
 It is suggested to monitor just a handful of critical volumes in PRTG and use dedicated performance monitoring solution for more advanced scenarios.
+
+### Pool sensor
+
+Several pool sensors can share this script. Just specify a different `Pool` in the parameters of each sensor.
+
+Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123" -Pool "bigdata"`
 
 ## Known issues and workarounds 
 
@@ -114,6 +125,8 @@ SANtricity has other API calls that can gather live statistics over a period suc
 
 ## Metrics
 
+### System and Volumes
+
 These *system* metrics are currently sent to PRTG. 
 
 - Average CPU utilization 
@@ -144,12 +157,27 @@ A few other were dropped because I didn't find them useful. Check "analysed-syst
 
 *Volume* metrics follow the same pattern and largely match analyzed system metrics included above. There's no average CPU utilization for volumes, that's true, but as long as a matching metric is available in selected "analysed-volume-statistics", it is also included in this sensor's output.
 
+### Pool
+
+- Reserve disk count for reconstruction 
+- Allocation granularity on pool level 
+- Minimum drive count 
+- Disk sector size recommended 
+- Used space 
+- Total RAID space 
+- Total extent capacity (R6) 
+- Total extent capacity (R1) 
+- Largest free extent size 
+- Free space
+
 ## Additional information
 
 Some related information can be found [here](https://scaleoutsean.github.io/2023/09/25/monitoring-netapp-eseries-with-prtg.html#security-in-shell-scripts).
 
 ## Change log
 
+- 2023/10/02
+  - Get-ESeriesPoolInfo.ps1 - 1.0.0 release with username/password authentication
 - 2023/10/01
   - Get-ESeriesInfo.ps1 - 1.1.0 release with username/password authentication
   - Get-ESeriesVolumeInfo.ps1 - initial 1.0.0 release with username/password authentication

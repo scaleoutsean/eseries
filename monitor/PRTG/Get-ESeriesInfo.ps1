@@ -31,7 +31,7 @@
   Gets useful metrics from SANtricity's "analysed-system-statistics" method and sends them as JSON to PRTG.
 .DESCRIPTION
   This script uses just one controller because it gets the metrics from the entire system.
-  It uses port 8443/TCP to access the SANtriity API.
+  It uses port 8443/TCP to access the SANtricity API.
   Configure ping or HTTPS sensor for the controllers to detect a failed controller.
   It is recommended to use the low-priveleged SANtricity monitor account.
 .PARAMETER ApiEp

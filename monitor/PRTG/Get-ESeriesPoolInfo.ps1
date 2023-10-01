@@ -2,9 +2,9 @@
 
 ###########################################################################
 # 
-# Name: Get-ESeriesVolumeInfo.ps1
+# Name: Get-ESeriesPoolInfo.ps1
 # 
-# Desc: EXE/Script sensor for volumes on NetApp E-Series v11 w/ PRTG v20-23
+# Desc: EXE/Script sensor for pools on NetApp E-Series v11 w/ PRTG v20-23
 # 
 # Author: @scaleoutSean (https://github.com/scaleoutsean)
 #
@@ -28,14 +28,13 @@
 
 <#
 .SYNOPSIS
-  Gets a subset of analyzed metrics for specified volume and send them as JSON to PRTG.
+  Gets a subset of analyzed metrics for specified DDP and send them as JSON to PRTG.
 .DESCRIPTION
-  This script requires just one controller. It defaults to 8443/TCP to access the SANtricity API.
+  Script requires just one controller. It defaults to 8443/TCP to access the SANtricity API.
   It uses username/password authentication, preferrably the read-only monitor role.
-  Configure ping or HTTPS sensor for the controllers to detect a failed controller.
-  It is recommended to use the low-priveleged SANtricity monitor account.
+  Configure a PRTG ping or HTTPS sensor for to detect when a controller fails.  
 .PARAMETER ApiEp
-  SANtricity API endpoint as IPv4 address or FQDN. Example: "8.4.4.3". Default: none
+  SANtricity API endpoint as IPv4 or FQDN address. Example: "8.4.4.3". Default: none
 .PARAMETER ApiPort
   SANtricity API port. Default: 8443
 .PARAMETER SanSysId
@@ -44,8 +43,8 @@
   Monitor account. Default: monitor
 .PARAMETER Password
   Password for the monitor account. Default: none
-.PARAMETER Vol
-  SANtricity volume name to monitor. Example: "pgdata". Default: none
+.PARAMETER Pool
+  SANtricity DDP (pool) name to monitor. Example: "bkp2dsk". Default: none
 .INPUTS
   None
 .OUTPUTS 
@@ -53,12 +52,12 @@
 .NOTES
   Version:        1.0.0
   Author:         scaleoutSean (https://github.com/scaleoutsean)
-  Creation Date:  2023/10/01
+  Creation Date:  2023/10/02
   Change:         Initial release
 .EXAMPLE
-  Get-ESeriesVolumeInfo.ps1 -ApiEp "192.168.1.0" -ApiPort "8443" `
+  Get-ESeriesPoolInfo.ps1 -ApiEp "192.168.1.0" -ApiPort 8443 `
     -SanSysId "600a098000f63714000000005e79c17c" -Account "monitor" -Password "monitor123" `
-    -Vol "pgdata"
+    -Pool "bkp2dsk"
 #>
 
 #---------------------------------------------------------[Parameters and Declarations]------------------------------------
@@ -72,10 +71,10 @@ Param (
     [string]$ApiEp,
 
     [Parameter(
-        Mandatory = $true,
+        Mandatory = $false,
         HelpMessage = 'SANtricity API port. Default: 8443')]
     [ValidateNotNullOrEmpty()]
-    [string]$ApiPort,
+    [string]$ApiPort = '8443',
 
     [Parameter(
         Mandatory = $false,
@@ -91,17 +90,17 @@ Param (
     [string]$Account = 'monitor',
 
     [Parameter(
-        Mandatory = $true,
+        Mandatory = $false,
         HelpMessage = 'SANtricty password for monitor account')]
     [ValidateNotNullOrEmpty()]
     [ValidateLength(8, 50)]
     [string]$Password,
 
     [Parameter(
-        Mandatory = $true,
-        HelpMessage = 'SANtricity volume name to monitor. Default: none')]
+        Mandatory = $false,
+        HelpMessage = 'SANtricity pool name to monitor. Default: none')]
     [ValidateNotNullOrEmpty()]
-    [string]$Vol
+    [string]$Pool
 )
 
 $ErrorActionPreference = 'SilentlyContinue'
@@ -192,7 +191,7 @@ Function SantricityLogin {
 }
 
 
-# Function to return volumes' statistics
+# Function to return pool's statistics
 Function SantricityGetSubSystemMetrics {
     Param (
         [Parameter(
@@ -208,16 +207,11 @@ Function SantricityGetSubSystemMetrics {
         [Parameter(
             Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$SanSysId,
-        
-        [Parameter(
-            Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$SubSystem
+        [string]$SanSysId
     )
         
     Try {
-        $ApiEpUri = "https://" + $ApiEp + ":" + $ApiPort + "/devmgr/v2/storage-systems/" + $SanSysId + "/analysed-" + $SubSystem + "-statistics"
+        $ApiEpUri = "https://" + $ApiEp + ":" + $ApiPort + "/devmgr/v2/storage-systems/" + $SanSysId + "/storage-pools"
         $responseList = Invoke-RestMethod -Uri $ApiEpUri -Method 'GET' -Headers $headers -WebSession $Global:esession 
         Return $responseList
     }
@@ -232,19 +226,19 @@ Function SantricityGetSubSystemMetrics {
 }
 
 
-# Filter volumes
-function FilterVolumes {
+# Filter DDPs
+function FilterPools {
     param (
         [Parameter(Mandatory = $true)]
         [array]$responseList,
         [Parameter(Mandatory = $true)]
-        [string]$Vol
+        [string]$Pool
     )
     
     $i = 0
     $filteredList = @()
     while ($i -lt ($responseList.count)) {        
-        if ($responseList[$i].VolumeName -ne $Vol) {
+        if ($responseList[$i].name -ne $Pool) {
         }
         else {
             $filteredList = $filteredList + $responseList[$i]
@@ -258,166 +252,108 @@ function FilterVolumes {
 
 $responseList = $null
 SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
-$responseList = SantricityGetSubSystemMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -SubSystem 'volume'
-$responseList = FilterVolumes -ResponseList $responseList -Vol $Vol
+$responseList = SantricityGetSubSystemMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+$responseList = FilterPools -ResponseList $responseList -Pool $Pool
 $PrtgData = @{"prtg" = @{"result" = @() } }
 
 foreach ($response in $responseList) {
-    $VolumeName = $response.volumeName
+    $PoolName = $response.name
+    $raidDetails = $response.extents.ddpRAIDCapacities
+    $i = 0
+    $j = $response.extents.ddpRAIDCapacities.Length
+    while ($i -ne $j) {
+        if ($raidDetails[$i].ddpVolRAIDLevel -eq "raid6") {
+            $R6UsableCapacity = $raidDetails[$i].usableCapacity
+        }
+        elseif ($raidDetails[$i].ddpVolRAIDLevel -eq "raid1") {
+            $R1UsableCapacity = $raidDetails[$i].usableCapacity
+        } else {
+            # Unknown RAID level that doesn't currently exist. Ignore for now.
+        }
+        $i++
+    }
     $record = $null
     $record = @(
         @{
-            "channel"     = "Read IOps ($VolumeName)";
-            "value"       = [math]::round(($response.readIOps), 2);
+            "channel"     = "Reserve disk count for reconstruction ($PoolName)";
+            "value"       = $response.volumeGroupData.diskPoolData.reconstructionReservedDriveCount;
             "unit"        = "Custom";
-            "customunit"  = "IO/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-                            
+            "customunit"  = "disk";
+            "float"       = 0;
+            "DecimalMode" = 0                      
         };
         @{
-            "channel"     = "Write IOps ($VolumeName)";
-            "value"       = [math]::round(($response.writeIOps), 2);
-            "unit"        = "Custom";
-            "customunit"  = "IO/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-                            
+            "channel"     = "Allocation granularity on pool level ($PoolName)";
+            "value"       = $response.volumeGroupData.diskPoolData.allocGranularity;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0                      
         };
         @{
-            "channel"     = "Other IOps ($VolumeName)";
-            "value"       = [math]::round(($response.otherIOps), 2);
+            "channel"     = "Minimum drive count ($PoolName)";
+            "value"       = $response.volumeGroupData.diskPoolData.minimumDriveCount;
             "unit"        = "Custom";
-            "customunit"  = "IO/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-                            
+            "customunit"  = "disk";
+            "float"       = 0;
+            "DecimalMode" = 0                      
         };
         @{
-            "channel"     = "Combined IOps ($VolumeName)";
-            "value"       = [math]::round(($response.combinedIOps), 2);
-            "unit"        = "Custom";
-            "customunit"  = "IO/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-                            
-        };
-        @{
-            "channel"     = "Read throughput ($VolumeName)";
-            "value"       = [math]::round(($response.readThroughput), 2);
-            "unit"        = "Custom";
-            "customunit"  = "MB/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-                            
-        };
-        @{
-            "channel"     = "Write throughput ($VolumeName)";
-            "value"       = [math]::round(($response.writeThroughput), 2);
-            "unit"        = "Custom";
-            "customunit"  = "MB/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Combined throughput ($VolumeName)";
-            "value"       = [math]::round(($response.combinedThroughput), 2);
-            "unit"        = "Custom";
-            "customunit"  = "MB/s";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Read response time ($VolumeName)";
-            "value"       = [math]::round(($response.readResponseTime), 2);
-            "unit"        = "Custom";
-            "customunit"  = "ms";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Write response time ($VolumeName)";
-            "value"       = [math]::round(($response.writeResponseTime), 2);
-            "unit"        = "Custom";
-            "customunit"  = "ms";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Combined response time ($VolumeName)";
-            "value"       = [math]::round(($response.combinedResponseTime), 2);
-            "unit"        = "Custom";
-            "customunit"  = "ms";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Read response time variation ($VolumeName)";
-            "value"       = [math]::round(($response.readResponseTimeStdDev), 2);
-            "unit"        = "Custom";
-            "customunit"  = "StdDev";
-            "float"       = 1;
-            "DecimalMode" = 1;
-            "ShowChart"   = 0
-        };
-        @{
-            "channel"     = "Write response time variation ($VolumeName)";
-            "value"       = [math]::round(($response.writeResponseTimeStdDev), 2);
-            "unit"        = "Custom";
-            "customunit"  = "StdDev";
-            "float"       = 1;
-            "DecimalMode" = 1;
-            "ShowChart"   = 0
-        };
-        @{
-            "channel"     = "Combined response time variation ($VolumeName)";
-            "value"       = [math]::round(($response.combinedResponseTimeStdDev), 2);
-            "unit"        = "Custom";
-            "customunit"  = "StdDev";
-            "float"       = 1;
-            "DecimalMode" = 1;
-            "ShowChart"   = 0
-        };
-        @{
-            "channel"     = "Read hit response time ($VolumeName)";
-            "value"       = [math]::round(($response.readHitResponseTime), 2);
-            "unit"        = "Custom";
-            "customunit"  = "ms";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Write hit response time ($VolumeName)";
-            "value"       = [math]::round(($response.writeHitResponseTime), 2);
-            "unit"        = "Custom";
-            "customunit"  = "ms";
-            "float"       = 1;
-            "DecimalMode" = 1
-        };
-        @{
-            "channel"     = "Average read operation size ($VolumeName)";
-            "value"       = [math]::round(($response.averageReadOpSize), 2);
+            "channel"     = "Disk sector size recommended ($PoolName)";
+            "value"       = $response.blkSizeRecommended;
             "unit"        = "Custom";
             "customunit"  = "bytes";
-            "float"       = 1;
-            "DecimalMode" = 1
+            "float"       = 0;
+            "DecimalMode" = 0
         };
         @{
-            "channel"     = "Full stripe writes percentage ($VolumeName)";
-            "value"       = [math]::round(($response.fullStripeWritesBytesPercent), 2);
-            "unit"        = "Custom";
-            "customunit"  = "%";
-            "float"       = 1;
-            "DecimalMode" = 1
+            "channel"     = "Used space ($PoolName)";
+            "value"       = $response.usedSpace;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0
         };
         @{
-            "channel"     = "Flash cache hit percent ($VolumeName)";
-            "value"       = [math]::round(($response.flashCacheHitPct), 2);
-            "unit"        = "Custom";
-            "customunit"  = "%";
-            "float"       = 1;
-            "DecimalMode" = 1
+            "channel"     = "Total RAID space ($PoolName)";
+            "value"       = $response.totalRaidedSpace;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0
         };
+        @{
+            "channel"     = "Total extent capacity (R6) ($PoolName)";
+            "value"       = $R6UsableCapacity;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0
+        };
+        @{
+            "channel"     = "Total extent capacity (R1) ($PoolName)";
+            "value"       = $R1UsableCapacity;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0
+        };
+        @{
+            "channel"     = "Largest free extent size ($PoolName)";
+            "value"       = $response.largestFreeExtentSize;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0
+        };
+        @{
+            "channel"     = "Free space ($PoolName)";
+            "value"       = $response.freeSpace;
+            "unit"        = "BytesDisk";
+            "VolumeSize"  = "Giga";
+            "float"       = 0;
+            "DecimalMode" = 0
+        }
     )
     $PrtgData.prtg.result += $record
 }
