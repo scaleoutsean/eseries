@@ -18,7 +18,7 @@
 
 ## What do these this script do
 
-### Storage System
+### Storage System (Get-ESeriesInfo.ps1)
 
 This script makes one API call to the SANtricity API endpoint to get "analysed-system-statistics".
 
@@ -26,7 +26,7 @@ Then it takes most of the metrics and sends them to stdout (and PRTG, when PRTG 
 
 Some metrics I don't find useful are dropped. 
 
-### Volume
+### Volume (Get-ESeriesVolumeInfo.ps1)
 
 This script makes one API call to the SANtricity API endpoint to get "analysed-system-statistics".
 
