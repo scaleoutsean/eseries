@@ -4,7 +4,12 @@
     - [Volume](#volume)
     - [DDP](#ddp)
   - [How to use them](#how-to-use-them)
+    - [Storage system sensor](#storage-system-sensor)
+    - [Volume\* performance sensor](#volume-performance-sensor)
   - [Known issues and workarounds](#known-issues-and-workarounds)
+    - [Encryption](#encryption)
+    - [Authentication and credentials](#authentication-and-credentials)
+    - [Accuracy](#accuracy)
   - [Metrics](#metrics)
   - [Additional information](#additional-information)
   - [Change log](#change-log)
@@ -43,16 +48,16 @@ Copy the script(s) to PRTG server's sub-sub-directory for EXEXML sensors:
 
 You can get SAN WWID from SANtricity or an SNMP walk, although any WWID will work since it's not required for correct functioning of the script (it's there to make such enforcement potentially possible, but neither SANtricity nor sensor scripts do any checks at this time).
 
-- In SANtricity 11.80 go to Settings > System > iSCSI/iSER over InfiniBand settings > Target IQN: iqn.1992-08.com.netapp:5700.**600a098000f63714000000005eaaabbb**
+- In SANtricity 11.80 go to Settings > System > iSCSI/iSER over InfiniBand settings > Target IQN: `iqn.1992-08.com.netapp:5700.**600a098000f63714000000005eaaabbb**`
 - Using SNMP walk output:
 
 ```raw
-enterprises.789.1123.2.500.1.2.0 = STRING: "600a098000f63714000000005eaabbccc"
+enterprises.789.1123.2.500.1.2.0 = STRING: "600a098000f63714000000005eaaabbb"
 ```
 
-- *Storage system* sensor script can be executed like this. 
+### Storage system sensor 
 
-From PowerShell 5.1 (x86) the script could be tested like so:
+This script can be executed from PowerShell 5.1 (x86) like so:
 
 ```pwsh
 .\Get-ESeriesInfo.ps1 -ApiEp "192.168.1.0" -ApiPort "8443" `
@@ -61,11 +66,13 @@ From PowerShell 5.1 (x86) the script could be tested like so:
 
 If that works fine (JSON output shows some performance metrics), you can create this EXE/Script sensor and configure it as any other.
 
-From PRTG pass parameters on like this, escaping special characters (`\$`) where necessary: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005e79c17c" -User "monitor" -Password "monitor\$123"`.
+From PRTG pass parameters on like this, escaping special characters (`\$`) where necessary: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor\$123"`.
 
-- *Volume* performance sensor script can be used for more than one volume; just create multiple sensors and make them all use the same script. Then name each sensor differently and pass the unique SANtricity volume name in sensor's parameters field.
+### Volume* performance sensor
 
-Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005e79c17c" -User "monitor" -Password "monitor\$123" -Vol "pgsql"`
+This script can be used for more than one volume; just create multiple sensors and make them all use the same script. Then name each sensor differently and pass the unique SANtricity volume name in sensor's parameters field.
+
+Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor\$123" -Vol "pgsql"`
 
 ![Configuring SANtricity volume sensor](/monitor/PRTG/prtg-script-sensor-parameters.png)
 
@@ -79,13 +86,13 @@ Rather than try to write a 2000 line script that works in 95% of circumstances, 
 
 (I don't even use PRTG or these scripts - all this is purely meant to help E-Series owners who use PRTG.)
 
-- Encryption
+### Encryption
 
 The script has no switch to ignore self-signed TLS certificates; they are ignored by default. 
 
 If you use valid TLS certificates that PRTG systems running sensors can recognize, remove the section of sensor code that ignore self-signed TLS certificates.
 
-- Authentication and credentials
+### Authentication and credentials
 
 By default these scripts requires that SANtricity credentials be passed to sensor as variables. Alternatively you may hard-code them in to the script.
 
@@ -95,7 +102,7 @@ Beware that if you enable logging, all parameter passed onto these sensor script
 
 ![Logged username and password in PRTG sensor log](/monitor/PRTG/prtg-script-log-if-enabled.png)
 
-- Accuracy
+### Accuracy
 
 As the API methods' names say, these metrics are analyzed, i.e. pre-processed by SANtricity OS on E-Series. That can be noticed when IO metrics remain stuck at 0 even after a workload has been initiated on an idle system.
 
