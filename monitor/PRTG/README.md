@@ -53,7 +53,7 @@ Copy the script(s) to PRTG server's sub-sub-directory for EXEXML sensors:
 
 You can get SAN WWID from SANtricity or an SNMP walk, although any WWID will work since it's not required for correct functioning of the script (it's there to make such enforcement potentially possible, but neither SANtricity nor sensor scripts do any checks at this time).
 
-- In SANtricity 11.80 go to Settings > System > iSCSI/iSER over InfiniBand settings > Target IQN: `iqn.1992-08.com.netapp:5700.**600a098000f63714000000005eaaabbb**`
+- In SANtricity 11.80 go to Settings > System > iSCSI/iSER over InfiniBand settings > Target IQN: `iqn.1992-08.com.netapp:5700.600a098000f63714000000005eaaabbb`
 - Using SNMP walk output:
 
 ```raw
