@@ -3,17 +3,22 @@
     - [Storage System (Get-ESeriesInfo.ps1)](#storage-system-get-eseriesinfops1)
     - [Volume (Get-ESeriesVolumeInfo.ps1)](#volume-get-eseriesvolumeinfops1)
     - [Pool (Get-ESeriesPoolInfo.ps1)](#pool-get-eseriespoolinfops1)
-  - [How to use them](#how-to-use-them)
+  - [How to use senor scripts](#how-to-use-senor-scripts)
     - [Storage system sensor](#storage-system-sensor)
     - [Volume\* performance sensor](#volume-performance-sensor)
     - [Pool sensor](#pool-sensor)
+    - [Snapshot/Clone/Repo sensor](#snapshotclonerepo-sensor)
   - [Known issues and workarounds](#known-issues-and-workarounds)
     - [Encryption](#encryption)
     - [Authentication and credentials](#authentication-and-credentials)
-    - [Accuracy](#accuracy)
+    - [Change in SANtricity storage object names require recreation of sensors that monitor by name](#change-in-santricity-storage-object-names-require-recreation-of-sensors-that-monitor-by-name)
+    - [Accuracy of performance metrics](#accuracy-of-performance-metrics)
+    - [Accuracy of capacity metrics](#accuracy-of-capacity-metrics)
+    - [DDP resilience is different from volume resilience](#ddp-resilience-is-different-from-volume-resilience)
   - [Metrics](#metrics)
     - [System and Volumes](#system-and-volumes)
     - [Pool](#pool)
+    - [Snapshots, clones and reserve space](#snapshots-clones-and-reserve-space)
   - [Additional information](#additional-information)
   - [Change log](#change-log)
 
@@ -43,7 +48,7 @@ Volumes on regular RAID disk groups usually consume the entire volume. There's n
 
 DDP, on the other hand, can accommodate volumes with heterogeneous RAID levels (RAID-1 and RAID-6, in SANtricity 11.80), so being able to see the capacity used by each, as well as other less obvious metrics without much clicking around is useful. Additionally, in SAS-based E- and EF-Series arrays, thin provisioning is possible, making this sensor even more useful. (EF300 and EF600 are NVMe-based.)
 
-## How to use them
+## How to use senor scripts
 
 EXE/Script sensors in PRTG v20-23 still mandates PowerShell 5.1 (x86), so that's what you must have.
 
@@ -89,6 +94,18 @@ Several pool sensors can share this script. Just specify a different `Pool` in t
 
 Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123" -Pool "bigdata"`
 
+### Snapshot/Clone/Repo sensor
+
+This sensor is very simple. It's there to get people started. Users are encouraged to improve it and submit pull requests.
+
+Several arrays share this sensor script. Just specify different parameters.
+
+Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123"`
+
+This sensor gives limited metrics on purpose.
+
+SANtricity has built-in alerts for snapshot and clone ("snapshot volume", as it's called) fullness, so it makes no sense to alert twice: you may configure SNMP Walk (for "Need Attention" indicator) or SNMP Trap Receiver sensor and receive alerts from E-Series in PRTG.
+
 ## Known issues and workarounds 
 
 There are too many possible combination of various settings, environments, preferences and approaches. 
@@ -113,7 +130,15 @@ Beware that if you enable logging, all parameter passed onto these sensor script
 
 ![Logged username and password in PRTG sensor log](/monitor/PRTG/prtg-script-log-if-enabled.png)
 
-### Accuracy
+### Change in SANtricity storage object names require recreation of sensors that monitor by name
+
+This was observed with pools, but probably applies to other sensors that monitor named objects: if a pool is renamed in SANtricity, the sensor that watches it fails and goes down.
+
+Furthermore, simply pausing the sensor, changing the parameter value, and restarting the sensor does not help.
+
+You need to delete the sensor and re-create it using the new parameter value. This doesn't seem to affect sensors that don't use names in parameter values. This looks like "PRTG behavior by design", so don't randomly rename pools, volumes and such without considering the possibility of causing alerts in PRTG.
+
+### Accuracy of performance metrics
 
 As the API methods' names say, these metrics are analyzed, i.e. pre-processed by SANtricity OS on E-Series. That can be noticed when IO metrics remain stuck at 0 even after a workload has been initiated on an idle system.
 
@@ -122,6 +147,24 @@ SANtricity needs some time to get several samples in order to create *analyzed* 
 As the exact way that analysis and processing are done is not documented, we can't know how correct they are. Generally they seem to flatten spikes, so they're "roughly" correct or "advisory".
 
 SANtricity has other API calls that can gather live statistics over a period such as 10 seconds, but if metrics are gathered once every 5 minutes averaged metrics will likely be more accurate than one random sample for a 10 second from the same period. This is why I find analyzed metrics acceptable despite their not necessarily being accurate at any point in time. 
+
+### Accuracy of capacity metrics
+
+Certain metrics may be off by a small(ish) amount because they were received as such.
+
+Sometimes you may have an "orphaned" repo volume not showing in SANtricity Web UI, but being accounted for in the API output. Normally SANtricity should alert you and ask you to reclaim unused space (i.e. delete the orphaned repo file(s)), but until you do a discrepancy between SANtricity Web UI and Snap/Clone/Repo sensor will exist.
+
+Of course, there may be other reasons such as conversion or other bugs in sensor code as well.
+
+### DDP resilience is different from volume resilience
+
+This DDP sensor may how "Reserve risk count for reconstruction" of 2 or more, and that applies to the pool. Just don't mistake that for concurrent disk loss tolerance of DDP RAID1 volumes.
+
+A DDP may lose one two drives at the same time without failing catastrophically. DDP-based RAID 6 volumes behave the same way, but RAID 1 volumes do not.
+
+Two simultaneously failed disks in a DDP pool with RAID 1-style volumes will cause RAID 1 volume data loss, while leaving RAID 6 volumes and DDP itself whole.
+
+See the [NetApp TR-4652](https://www.netapp.com/media/12421-tr4652.pdf) for more on DDP.
 
 ## Metrics
 
@@ -151,7 +194,12 @@ These *system* metrics are currently sent to PRTG.
 - RAID6 IO percentage 
 - DDP IO percentage 
 - Read hit response time 
-- Write hit response time 
+- Write hit response time
+- Drive count (system only)
+- Used pool space (system only)
+- Unconfigured space (system only)
+- Free pool pace (system only)
+- Hot spare count in standby (system only)
 
 A few other were dropped because I didn't find them useful. Check "analysed-system-statistics" in the SANtricity API to find out more.
 
@@ -170,12 +218,23 @@ A few other were dropped because I didn't find them useful. Check "analysed-syst
 - Largest free extent size 
 - Free space
 
+### Snapshots, clones and reserve space
+
+As explained earlier these indicators exist merely to show you how much capacity (GiB) is being used by these features. Think of it is as a cost indicator of snapshot and clone usage.
+
+- Total snapshot reserve space
+- Total clone (aka "snapshot volume") reserve space
+- Total snapshot and clone reserve space
+
 ## Additional information
 
 Some related information can be found [here](https://scaleoutsean.github.io/2023/09/25/monitoring-netapp-eseries-with-prtg.html#security-in-shell-scripts).
 
 ## Change log
 
+- 2023/10/12
+  - Get-ESeriesPoolInfo.ps1 - initial 1.0.0 release with snapshot and clone reserve capacity metrics
+  - Get-ESeriesInfo.ps1 - 1.2.0 release with system capacity and drive count metric
 - 2023/10/02
   - Get-ESeriesPoolInfo.ps1 - 1.0.0 release with username/password authentication
 - 2023/10/01

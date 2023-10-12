@@ -49,10 +49,10 @@
 .OUTPUTS 
   Stdout (JSON) for PRTG EXE/Script sensor
 .NOTES
-  Version:        1.1.0
+  Version:        1.2.0
   Author:         scaleoutSean (https://github.com/scaleoutsean)
-  Creation Date:  2023/10/01
-  Change:         Change from JWT to session cookie authentication
+  Creation Date:  2023/10/12
+  Change:         Add few system metrics related to capacity utilization
 .EXAMPLE
   .\Get-ESeriesInfo.ps1 -ApiEp "192.168.1.0" -ApiPort "8443" `
     -SanSysId "600a098000f63714000000005e79c17c" `
@@ -222,11 +222,48 @@ Function SantricityGetMetrics {
     }
 }
 
+
+# Function to return system information 
+Function SantricityGetStorageSystem {
+    Param (
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ApiEp,
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$ApiPort,
+
+        [Parameter(
+            Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$SanSysId
+    )
+       
+    Try {
+        $ApiEpUri = "https://" + $ApiEp + ":" + $ApiPort + "/devmgr/v2/storage-systems/" + $SanSysId
+        $response = Invoke-RestMethod -Uri $ApiEpUri -Method 'GET' -Headers $headers -WebSession $Global:esession
+        return($response)
+    }
+    Catch {
+        if ($_.ErrorDetails.Message) {
+            Write-Host $_.ErrorDetails.Message
+        }
+        else {
+            Write-Host $_
+        }
+    }
+}
+
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
 SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
 $response = SantricityGetMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -SubSystem "system"
 $SystemName = $response.storageSystemName
+$SystemName = $response.storageSystemName
+$responseSys = SantricityGetStorageSystem -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
 
 @{
     "prtg" = @{
@@ -424,7 +461,45 @@ $SystemName = $response.storageSystemName
                 "customunit"  = "ms";
                 "float"       = 1;
                 "DecimalMode" = 1
-            }
+            };
+            @{
+                "channel"     = "Drive count ($SystemName)";
+                "value"       = ($responseSys.driveCount);
+                "unit"        = "Count";
+                "float"       = 0;
+                "DecimalMode" = 0
+            };
+            @{
+                "channel"     = "Used pool space ($SystemName)";
+                "value"       = ($responseSys.usedPoolSpace);
+                "unit"        = "BytesDisk";
+                "customunit"  = "TB";
+                "float"       = 0;
+                "DecimalMode" = 0
+            };
+            @{
+                "channel"     = "Unconfigured space ($SystemName)";
+                "value"       = ($responseSys.unconfiguredSpace);
+                "unit"        = "BytesDisk";
+                "customunit"  = "TB";
+                "float"       = 0;
+                "DecimalMode" = 0
+            };
+            @{
+                "channel"     = "Free pool space ($SystemName)";
+                "value"       = ($responseSys.freePoolSpace);
+                "unit"        = "BytesDisk";
+                "customunit"  = "TB";
+                "float"       = 0;
+                "DecimalMode" = 0
+            };
+            @{
+                "channel"     = "Hot spare count in standby ($SystemName)";
+                "value"       = [int]($responseSys.hotSpareCountInStandby);
+                "unit"        = "Count"
+                "float"       = 0;
+                "DecimalMode" = 0
+            };
         ) 
     }
 } | ConvertTo-Json -Depth 3
