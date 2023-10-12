@@ -48,10 +48,10 @@
 .OUTPUTS 
   Stdout (JSON) for PRTG EXE/Script sensor
 .NOTES
-  Version:        1.0.0
+  Version:        1.0.1
   Author:         scaleoutSean (https://github.com/scaleoutsean)
   Creation Date:  2023/10/12
-  Change:         Initial release
+  Change:         Include all repos in repo size calculation
 .EXAMPLE
   Get-ESeriesSnapCloneRepoInfo.ps1 -ApiEp "192.168.1.0" -ApiPort 8443 `
     -SanSysId "600a098000f63714000000005e79c17c" -Account "monitor" -Password "monitor123"
@@ -375,7 +375,7 @@ function SANtricityGetRepoVolumes {
     $i = 0
     $filteredList = @()
     while ($i -lt ($responseList.count)) {        
-        if ($responseList[$i].name -match "\brepos_[0-9][0-9][0-9][0-9]\b" -and $responseList[$i].volumeUse -eq "concatVolume" -and $responseList[$i].name -notmatch "repos_0000") {
+        if ($responseList[$i].name -match "\brepos_[0-9][0-9][0-9][0-9]\b" -and $responseList[$i].volumeUse -eq "concatVolume") {
             $filteredList = $filteredList + $responseList[$i]
         }
         $i++
@@ -390,6 +390,7 @@ function SantricityGetSnapReserveUtilization {
         [Parameter(Mandatory = $true)]
         [array]$sru
     )
+
     $srbu,$srba = $null,$null
     foreach ($s in $sru) { 
         $srbu += [int64]$s.pitGroupBytesUsed
@@ -407,7 +408,8 @@ function SantricityGetTotalSnapRepoSize {
     param (
         [Parameter(Mandatory = $true)]
         [array]$snapshotGroups
-    )    
+    )
+
     [int64]$TotalSnapRepoSize = ($snapshotGroups.repositoryCapacity | Measure-Object -Sum).Sum
     return ($TotalSnapRepoSize)
 }

@@ -152,7 +152,9 @@ SANtricity has other API calls that can gather live statistics over a period suc
 
 Certain metrics may be off by a small(ish) amount because they were received as such.
 
-Sometimes you may have an "orphaned" repo volume not showing in SANtricity Web UI, but being accounted for in the API output. Normally SANtricity should alert you and ask you to reclaim unused space (i.e. delete the orphaned repo file(s)), but until you do a discrepancy between SANtricity Web UI and Snap/Clone/Repo sensor will exist.
+Sometimes an "orphaned" repo volume may be not showing in SANtricity Web UI, but it's being accounted for in the API and Snap/Clone/Repo sensor. Normally SANtricity should alert you and ask you to reclaim unused space (i.e. delete the orphaned repo file(s)), but until you do a discrepancy between SANtricity Web UI and Snap/Clone/Repo sensor will exist. 
+
+I came across this problem with an orphaned repo that I could not delete, so I "solved" it by excluding it from the total repo capacity calculation just to be able to visually verify sensor output vs. SANtricity Web UI. But the posted senor now includes capacity from all repository volumes. If you see a discrepancy due to orphaned repository volumes, contact NetApp Support to reclaimed orphaned repository volumes.
 
 Of course, there may be other reasons such as conversion or other bugs in sensor code as well.
 
@@ -233,7 +235,7 @@ Some related information can be found [here](https://scaleoutsean.github.io/2023
 ## Change log
 
 - 2023/10/12
-  - Get-ESeriesPoolInfo.ps1 - initial 1.0.0 release with snapshot and clone reserve capacity metrics
+  - Get-ESeriesPoolInfo.ps1 - initial 1.0.1 release with snapshot and clone reserve capacity metrics
   - Get-ESeriesInfo.ps1 - 1.2.0 release with system capacity and drive count metric
 - 2023/10/02
   - Get-ESeriesPoolInfo.ps1 - 1.0.0 release with username/password authentication
