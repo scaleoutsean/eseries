@@ -3,11 +3,14 @@
     - [Storage System (Get-ESeriesInfo.ps1)](#storage-system-get-eseriesinfops1)
     - [Volume (Get-ESeriesVolumeInfo.ps1)](#volume-get-eseriesvolumeinfops1)
     - [Pool (Get-ESeriesPoolInfo.ps1)](#pool-get-eseriespoolinfops1)
+    - [Snapshot, clone and repository (Get-ESeriesSnapCloneRepoInfo.ps1)](#snapshot-clone-and-repository-get-eseriessnapclonerepoinfops1)
+    - [Snapshot Consistency Group (Get-ESeriesCGInfo.ps1)](#snapshot-consistency-group-get-eseriescginfops1)
   - [How to use senor scripts](#how-to-use-senor-scripts)
     - [Storage system sensor](#storage-system-sensor)
     - [Volume\* performance sensor](#volume-performance-sensor)
     - [Pool sensor](#pool-sensor)
     - [Snapshot/Clone/Repo sensor](#snapshotclonerepo-sensor)
+    - [Snapshot Consistency Group sensor](#snapshot-consistency-group-sensor)
   - [Known issues and workarounds](#known-issues-and-workarounds)
     - [Encryption](#encryption)
     - [Authentication and credentials](#authentication-and-credentials)
@@ -15,10 +18,12 @@
     - [Accuracy of performance metrics](#accuracy-of-performance-metrics)
     - [Accuracy of capacity metrics](#accuracy-of-capacity-metrics)
     - [DDP resilience is different from volume resilience](#ddp-resilience-is-different-from-volume-resilience)
+    - [Performance aggregates in Snapshot Consistency Group sensor](#performance-aggregates-in-snapshot-consistency-group-sensor)
   - [Metrics](#metrics)
     - [System and Volumes](#system-and-volumes)
     - [Pool](#pool)
     - [Snapshots, clones and reserve space](#snapshots-clones-and-reserve-space)
+    - [Snapshot Consistency Group](#snapshot-consistency-group)
   - [Additional information](#additional-information)
   - [Change log](#change-log)
 
@@ -47,6 +52,18 @@ It closely reflects metrics from Storage System sensor. Some metrics I don't fin
 Volumes on regular RAID disk groups usually consume the entire volume. There's no storage savings (compression, deduplication) or thin provisioning, so it's easy to reason about these.
 
 DDP, on the other hand, can accommodate volumes with heterogeneous RAID levels (RAID-1 and RAID-6, in SANtricity 11.80), so being able to see the capacity used by each, as well as other less obvious metrics without much clicking around is useful. Additionally, in SAS-based E- and EF-Series arrays, thin provisioning is possible, making this sensor even more useful. (EF300 and EF600 are NVMe-based.)
+
+### Snapshot, clone and repository (Get-ESeriesSnapCloneRepoInfo.ps1)
+
+Primarily for space consumption (in repository volumes) by snapshots and writable clones.
+
+### Snapshot Consistency Group (Get-ESeriesCGInfo.ps1)
+
+Watches specific (snapshot) Consistency Group. 
+
+The purpose of this sensor is not just to watch snapshots and clones, but also aggregate CG capacity, reserve volume utilization, and performance for the CG of interest.
+
+The main use case for this is monitoring of symmetric scale-out workloads such as NOSQL databases, Kafka or MinIO.
 
 ## How to use senor scripts
 
@@ -105,6 +122,20 @@ Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000
 This sensor gives limited metrics on purpose.
 
 SANtricity has built-in alerts for snapshot and clone ("snapshot volume", as it's called) fullness, so it makes no sense to alert twice: you may configure SNMP Walk (for "Need Attention" indicator) or SNMP Trap Receiver sensor and receive alerts from E-Series in PRTG.
+
+### Snapshot Consistency Group sensor
+
+Just specify the CG with `-CG`:
+
+```pwsh
+.\Get-ESeriesCGInfo.ps1 -ApiEp "192.168.1.0" -ApiPort "8443" `
+    -SanSysId "600a098000f63714000000005e79c17c" -Account "monitor" -Password "monitor123" `
+    -CG "CG_ELK"
+```
+
+PRTG example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123" -CG "CG_ELK"`
+
+Use multiple sensors for multiple CGs.
 
 ## Known issues and workarounds 
 
@@ -168,6 +199,14 @@ Two simultaneously failed disks in a DDP pool with RAID 1-style volumes will cau
 
 See the [NetApp TR-4652](https://www.netapp.com/media/12421-tr4652.pdf) for more on DDP.
 
+### Performance aggregates in Snapshot Consistency Group sensor
+
+As mentioned above, aggregate performance metrics use "analyzed" volume performance metrics which are averages obtained from the constituent volumes, which means they're (a) delayed and take time to react, and (b) they show average values. 
+
+The numbers seem accurately computed - as far as I can tell - by adding averages from the member volumes, but if there's server-side caching or workload isn't constant, it may be difficult to to reconcile server- and client-side figures.
+
+The SANtricity API has volume performance metrics, but those point-in-time numbers would also be difficult to use because each sample taken every 5 minutes could range from 0 to the controller maximum.
+
 ## Metrics
 
 ### System and Volumes
@@ -228,12 +267,39 @@ As explained earlier these indicators exist merely to show you how much capacity
 - Total clone (aka "snapshot volume") reserve space
 - Total snapshot and clone reserve space
 
+### Snapshot Consistency Group
+
+I use "clone" instead of "snapshot volume" because it's shorter (and PRTG recommends short metric names) and less annoying.
+
+- Member volumes
+- Read throughput
+- Write throughput 
+- Read IOPS
+- Write IOPS
+- Clone repo capacity used
+- RO clone volumes
+- RW clone volumes
+- Volume clones
+- Clone sets
+- Clone sets in optimal state
+- Snapshot limit
+- Snapshots used
+- Snapshots available
+- Unique cache settings
+- Age of newest snapshot
+- Age of newest RO clone
+- Age of newest RW clone
+- Active snapshot schedule
+- Capacity
+
 ## Additional information
 
 Some related information can be found [here](https://scaleoutsean.github.io/2023/09/25/monitoring-netapp-eseries-with-prtg.html#security-in-shell-scripts).
 
 ## Change log
 
+- 2023/10/30
+  - Get-ESeriesCGInfo.ps1 - initial 1.0.0 release for Consistency Group monitoring
 - 2023/10/12
   - Get-ESeriesPoolInfo.ps1 - initial 1.0.1 release with snapshot and clone reserve capacity metrics
   - Get-ESeriesInfo.ps1 - 1.2.0 release with system capacity and drive count metric
