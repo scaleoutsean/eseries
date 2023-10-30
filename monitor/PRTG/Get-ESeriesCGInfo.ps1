@@ -194,7 +194,6 @@ Function SantricityLogin {
 
 
 # Function to return all CGs from the system
-# curl -X GET "https://10.113.1.158:8443/devmgr/v2/storage-systems/600A098000F63714000000005E79C17C/consistency-groups"
 Function SantricityGetCGs {
     Param (
         [Parameter(
