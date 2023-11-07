@@ -301,7 +301,7 @@ Some related information can be found [here](https://scaleoutsean.github.io/2023
 - 2023/10/30
   - Get-ESeriesCGInfo.ps1 - initial 1.0.0 release for Consistency Group monitoring
 - 2023/10/12
-  - Get-ESeriesPoolInfo.ps1 - initial 1.0.1 release with snapshot and clone reserve capacity metrics
+  - Get-ESeriesSnapCloneRepoInfo.ps1 - initial 1.0.1 with snapshot and clone reserve capacity metrics
   - Get-ESeriesInfo.ps1 - 1.2.0 release with system capacity and drive count metric
 - 2023/10/02
   - Get-ESeriesPoolInfo.ps1 - 1.0.0 release with username/password authentication
