@@ -15,7 +15,7 @@
 
 ## Comparison of E-Series in terms of shelves and disks
 
-NetApp is unable to provide this unless you're spend some time digging around various search engines, so here goes:
+NetApp is unable to provide this unless you're willing to spend some time digging around various search engines. [This](https://docs.netapp.com/us-en/e-series/getting-started/learn-hardware-concept.html) is as good as it gets.
 
 
 | Model | Controller / base shelf | Max NL-SAS HDDs | Max SAS SSDs | Max NVMe SSDs | Expansion | Max exp DE212C | Max exp DE224C | Max exp DE460C |
