@@ -20,12 +20,12 @@ NetApp is unable to provide this unless you're spend some time digging around va
 
 | Model | Controller / base shelf | Max NL-SAS HDDs | Max SAS SSDs | Max NVMe SSDs | Expansion | Max exp DE212C | Max exp DE224C | Max exp DE460C |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| EF300 | NE224 (NVMe controller shelf) | 240 | 96 | 24 | Yes | 8 | 4 | 4 |
-| EF600 | NE224 (NVMe controller shelf) | 420 | 96 | 24 | Yes | 8 | 7 | 7 |
-| EF300C | NE224 (NVMe QLC controller shelf) | - | - | 24 (QLC only, DDP 11-24) | No | - | - | - |
-| EF600C | NE224 (NVMe QLC controller shelf) | - | - | 24 (QLC only, DDP 11-24) | No | - | - | - |
-| E4012 | DE212C (SAS controller shelf) | 300 | 96 | - | Yes | 7 | - | 4 |
-| E4060 | DE460C (SAS controller shelf) | 300 | 120 | - | Yes | 7 | - | 4 |
+| EF300 | NE224 (NVMe shelf) | 240 | 96 | 24 | Yes | 8 | 4 | 4 |
+| EF600 | NE224 (NVMe shelf) | 420 | 96 | 24 | Yes | 8 | 7 | 7 |
+| EF300C | NE224 (NVMe shelf) | - | - | 24 (QLC only, DDP 11-24) | No | - | - | - |
+| EF600C | NE224 (NVMe shelf) | - | - | 24 (QLC only, DDP 11-24) | No | - | - | - |
+| E4012 | DE212C (SAS shelf) | 300 | 96 | - | Yes | 7 | - | 4 |
+| E4060 | DE460C (SAS shelf) | 300 | 120 | - | Yes | 7 | - | 4 |
 
 Reference TRs with TR mentioned separately for easy search when they break links again:
 
