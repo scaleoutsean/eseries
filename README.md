@@ -14,7 +14,7 @@ Topics that deserve own repositories can be found in own repositories (`santrici
 
 - Various scripts related to monitoring
   - PRTG - PowerShell-based scripts that can monitor several SANtricity objects
-  - Glances - the most basic SANtricity facts for SAntricity
+  - Glances - basic SANtricity monitor (moved to [https://github.com/scaleoutsean/glances/](https://github.com/scaleoutsean/glances/) or maybe even upstream)
 
 Note there stand-alone solutions like [E-Series Perf Analyzer](https://github.com/scaleoutsean/eseries-perf-analyzer) (complex) and [E-Series SANtricity Collector](https://github.com/scaleoutsean/eseries-santricity-collector) (complex).
 
