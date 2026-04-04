@@ -104,7 +104,7 @@ Param (
     [string]$Vol
 )
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
 
 $Global:headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
 $headers.Add('Accept', 'application/json')
@@ -180,6 +180,7 @@ Function SantricityLogin {
     $API_ENDPOINT_LOGIN = 'https://' + $ApiEp + ':' + $ApiPort + '/' + 'devmgr/utils/login'
     Try {
         $null = Invoke-RestMethod -Uri $API_ENDPOINT_LOGIN -Method 'POST' -Headers $headers -Body $body -SessionVariable Global:esession
+        return $true
     }
     Catch {
         if ($_.ErrorDetails.Message) {
@@ -188,6 +189,7 @@ Function SantricityLogin {
         else {
             Write-Host $_
         }
+        return $false
     }
 }
 
@@ -228,7 +230,22 @@ Function SantricityGetSubSystemMetrics {
         else {
             Write-Host $_
         }
+        return @()
     }
+}
+
+function Write-PrtgError {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    @{
+        "prtg" = @{
+            "error" = 1
+            "text"  = $Message
+        }
+    } | ConvertTo-Json -Depth 3
 }
 
 
@@ -257,9 +274,24 @@ function FilterVolumes {
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
 $responseList = $null
-SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+$loginOk = SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+if (-not $loginOk) {
+    Write-PrtgError -Message "SANtricity login failed for endpoint ${ApiEp}:$ApiPort"
+    exit 1
+}
+
 $responseList = SantricityGetSubSystemMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -SubSystem 'volume'
+if (@($responseList).Count -eq 0) {
+    Write-PrtgError -Message "No volume metrics returned from SANtricity"
+    exit 1
+}
+
 $responseList = FilterVolumes -ResponseList $responseList -Vol $Vol
+if (@($responseList).Count -eq 0) {
+    Write-PrtgError -Message "Volume '$Vol' was not found in analysed-volume-statistics"
+    exit 1
+}
+
 $PrtgData = @{"prtg" = @{"result" = @() } }
 
 foreach ($response in $responseList) {

@@ -137,24 +137,24 @@ Function SantricityLogin {
     Param (
 
         [Parameter(
-            Mandatory = $false)]
+            Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$ApiEp="10.113.1.158",
+        [string]$ApiEp,
 
         [Parameter(
-            Mandatory = $false)]
+            Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$ApiPort="8443",
+        [string]$ApiPort,
 
         [Parameter(
-            Mandatory = $false)]
+            Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$Account="monitor",
+        [string]$Account,
 
         [Parameter(
-            Mandatory = $false)]
+            Mandatory = $true)]
         [ValidateNotNullOrEmpty()]
-        [string]$Password="monitor123"
+        [string]$Password
     
     )
         

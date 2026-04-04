@@ -96,7 +96,7 @@ Param (
 
 )
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
 
 $Global:headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
 $headers.Add('Accept', 'application/json')
@@ -172,6 +172,7 @@ Function SantricityLogin {
     $API_ENDPOINT_LOGIN = 'https://' + $ApiEp + ':' + $ApiPort + '/devmgr/utils/login'
     Try {
         $null = Invoke-RestMethod -Uri $API_ENDPOINT_LOGIN -Method 'POST' -Headers $headers -Body $body -SessionVariable Global:esession
+        return $true
     }
     Catch {
         if ($_.ErrorDetails.Message) {
@@ -180,6 +181,7 @@ Function SantricityLogin {
         else {
             Write-Host $_
         }
+        return $false
     }
 }
 
@@ -219,6 +221,7 @@ Function SantricityGetMetrics {
         else {
             Write-Host $_
         }
+        return $null
     }
 }
 
@@ -254,16 +257,46 @@ Function SantricityGetStorageSystem {
         else {
             Write-Host $_
         }
+        return $null
     }
+}
+
+function Write-PrtgError {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    @{
+        "prtg" = @{
+            "error" = 1
+            "text"  = $Message
+        }
+    } | ConvertTo-Json -Depth 3
 }
 
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
-SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+$loginOk = SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+if (-not $loginOk) {
+    Write-PrtgError -Message "SANtricity login failed for endpoint ${ApiEp}:$ApiPort"
+    exit 1
+}
+
 $response = SantricityGetMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -SubSystem "system"
-$SystemName = $response.storageSystemName
-$SystemName = $response.storageSystemName
 $responseSys = SantricityGetStorageSystem -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+
+if ($null -eq $response) {
+    Write-PrtgError -Message "Failed to retrieve analysed-system-statistics from SANtricity"
+    exit 1
+}
+
+if ($null -eq $responseSys) {
+    Write-PrtgError -Message "Failed to retrieve storage-system details from SANtricity"
+    exit 1
+}
+
+$SystemName = if ([string]::IsNullOrWhiteSpace($response.storageSystemName)) { "UNKNOWN" } else { $response.storageSystemName }
 
 @{
     "prtg" = @{

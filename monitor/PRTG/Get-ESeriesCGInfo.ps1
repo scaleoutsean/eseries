@@ -527,7 +527,7 @@ $CgLatestSnapshotAgeHrs = [math]::round((((Get-Date (Get-Date).ToUniversalTime()
 $SanSystemSnapshotVolumes = SantricityGetSystemSnapshotVolumes -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
 $CGSnapshotVolumes = ($SanSystemSnapshotVolumes | Where-Object -Property consistencyGroupId -EQ $consistencyGroupId)
 if (($CGSnapshotVolumes).Count -gt 0) {
-    $SanCGSnapshotVolumeCount = $CGSnapshotVolumes.Count
+    $SanCGSnapshotVolumeCount = @($CGSnapshotVolumes).Count
 } else { 
     $SanCGSnapshotVolumeCount = 0
 }
@@ -535,7 +535,7 @@ if (($CGSnapshotVolumes).Count -gt 0) {
 # get repository utilization by CG clones 
 $CGRepositoryUtilizationBytes = 0
 foreach ($vol in $CGSnapshotVolumes) {
-    $CGRepositoryUtilizationBytes += $vol.repositoryCapacity
+    $CGRepositoryUtilizationBytes += [int64]$vol.repositoryCapacity
 }
 
 # find autoDelete limit for CG snapshots and calculate used and available
@@ -573,6 +573,10 @@ foreach ($v in $SanVolumeStats) {
         $null = $CGPerfMetrics.Add($vPerfData)
     }
 }
+$CGReadThroughput = 0
+$CGWriteThroughput = 0
+$CGReadIOps = 0
+$CGWriteIOps = 0
 foreach ($vStats in $CGPerfMetrics) {
     $CGReadThroughput = $CGReadThroughput + [float]$vStats[1]
     $CGWriteThroughput = $CGWriteThroughput + [float]$vStats[2]
