@@ -103,7 +103,7 @@ Param (
     [string]$Pool
 )
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
 
 $Global:headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
 $headers.Add('Accept', 'application/json')
@@ -179,6 +179,7 @@ Function SantricityLogin {
     $API_ENDPOINT_LOGIN = 'https://' + $ApiEp + ':' + $ApiPort + '/' + 'devmgr/utils/login'
     Try {
         $null = Invoke-RestMethod -Uri $API_ENDPOINT_LOGIN -Method 'POST' -Headers $headers -Body $body -SessionVariable Global:esession
+        return $true
     }
     Catch {
         if ($_.ErrorDetails.Message) {
@@ -187,6 +188,7 @@ Function SantricityLogin {
         else {
             Write-Host $_
         }
+        return $false
     }
 }
 
@@ -222,7 +224,22 @@ Function SantricityGetSubSystemMetrics {
         else {
             Write-Host $_
         }
+        return @()
     }
+}
+
+function Write-PrtgError {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    @{
+        "prtg" = @{
+            "error" = 1
+            "text"  = $Message
+        }
+    } | ConvertTo-Json -Depth 3
 }
 
 
@@ -251,16 +268,33 @@ function FilterPools {
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
 $responseList = $null
-SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+$loginOk = SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+if (-not $loginOk) {
+    Write-PrtgError -Message "SANtricity login failed for endpoint ${ApiEp}:$ApiPort"
+    exit 1
+}
+
 $responseList = SantricityGetSubSystemMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+if (@($responseList).Count -eq 0) {
+    Write-PrtgError -Message "No storage pool data returned from SANtricity"
+    exit 1
+}
+
 $responseList = FilterPools -ResponseList $responseList -Pool $Pool
+if (@($responseList).Count -eq 0) {
+    Write-PrtgError -Message "Pool '$Pool' was not found in SANtricity storage-pools"
+    exit 1
+}
+
 $PrtgData = @{"prtg" = @{"result" = @() } }
 
 foreach ($response in $responseList) {
     $PoolName = $response.name
     $raidDetails = $response.extents.ddpRAIDCapacities
+    $R6UsableCapacity = 0
+    $R1UsableCapacity = 0
     $i = 0
-    $j = $response.extents.ddpRAIDCapacities.Length
+    $j = @($response.extents.ddpRAIDCapacities).Length
     while ($i -ne $j) {
         if ($raidDetails[$i].ddpVolRAIDLevel -eq "raid6") {
             $R6UsableCapacity = $raidDetails[$i].usableCapacity

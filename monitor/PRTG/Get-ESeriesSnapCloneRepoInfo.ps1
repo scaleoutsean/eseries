@@ -95,6 +95,8 @@ Param (
 
 )
 
+$ErrorActionPreference = 'Stop'
+
 
 $Global:headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
 $headers.Add('Accept', 'application/json')
@@ -170,6 +172,7 @@ Function SantricityLogin {
     $API_ENDPOINT_LOGIN = 'https://' + $ApiEp + ':' + $ApiPort + '/' + 'devmgr/utils/login'
     Try {
        $null = Invoke-RestMethod -Uri $API_ENDPOINT_LOGIN -Method 'POST' -Headers $headers -Body $body -SessionVariable Global:esession
+       return $true
     }
     Catch {
         if ($_.ErrorDetails.Message) {
@@ -178,6 +181,7 @@ Function SantricityLogin {
         else {
             Write-Host $_
         }
+        return $false
     }
 }
 
@@ -202,7 +206,7 @@ Function SantricityGetSystemInfo {
     )
         
     Try {
-        $ApiEpUri = "https://" + $ApiEp + ":" + $ApiPort + "/devmgr/v2/storage-systems"
+        $ApiEpUri = "https://" + $ApiEp + ":" + $ApiPort + "/devmgr/v2/storage-systems/" + $SanSysId
         $systemInfo = Invoke-RestMethod -Uri $ApiEpUri -Method 'GET' -Headers $headers -WebSession $Global:esession
         Return $systemInfo
     }
@@ -213,6 +217,7 @@ Function SantricityGetSystemInfo {
         else {
             Write-Host $_
         }
+        return $null
     }
 }
 
@@ -250,6 +255,7 @@ Function SantricityGetSnapshotGroups {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -287,6 +293,7 @@ Function SantricityGetSnapshotGroupsRepositoryUtilization {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -324,6 +331,7 @@ Function SantricityGetSnaphotVolumesRepositoryUtilization {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -361,6 +369,7 @@ Function SantricityGetVolumes {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -395,11 +404,11 @@ function SantricityGetSnapReserveUtilization {
     foreach ($s in $sru) { 
         $srbu += [int64]$s.pitGroupBytesUsed
         $srba += [int64]$s.pitGroupBytesAvailable
+    }
     $SRUsed = [System.Math]::round($srbu,4)
     $SRAvail = [System.Math]::round($srba,4)
-    $SRFullPct = [System.Math]::round(($srbu/($srba+$srbu))*100,3)
+    $SRFullPct = if (($srba + $srbu) -eq 0) { 0 } else { [System.Math]::round(($srbu/($srba+$srbu))*100,3) }
     return ($SRUsed, $SRAvail, $SRFullPct)
-    }
 }
 
 
@@ -429,8 +438,22 @@ function SantricityGetCloneReserveUtilization {
     }
     $CRUsed = [System.Math]::round($cabu,4)
     $CRAvail = [System.Math]::round($caba,4)
-    $CRFullPct = [System.Math]::round(($cabu/($caba+$cabu))*100,3)
+    $CRFullPct = if (($caba + $cabu) -eq 0) { 0 } else { [System.Math]::round(($cabu/($caba+$cabu))*100,3) }
     return ($CRUsed, $CRAvail, $CRFullPct)
+}
+
+function Write-PrtgError {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    @{
+        "prtg" = @{
+            "error" = 1
+            "text"  = $Message
+        }
+    } | ConvertTo-Json -Depth 3
 }
 
 
@@ -494,21 +517,34 @@ function PRTGDataRecord {
 
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
-SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+$loginOk = SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+if (-not $loginOk) {
+    Write-PrtgError -Message "SANtricity login failed for endpoint ${ApiEp}:$ApiPort"
+    exit 1
+}
 
 $systemInfo = SantricityGetSystemInfo -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+if ($null -eq $systemInfo) {
+    Write-PrtgError -Message "Failed to retrieve storage system details from SANtricity"
+    exit 1
+}
+
 $SystemName = $systemInfo.name
 
 $sgs = SantricityGetSnapshotGroups -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
 $sru = SantricityGetSnapshotGroupsRepositoryUtilization -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
 $snapRepoCap = SantricityGetTotalSnapRepoSize -snapshotGroups $sgs
 $cru = SantricityGetSnaphotVolumesRepositoryUtilization -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
-$SnapReserveStats = SantricityGetSnapReserveUtilization -sru $sru 
 
 $CloneReserveStats = SantricityGetCloneReserveUtilization -cru $cru 
-$cloneRepoCap = $cloneReserveStats[1]
+$cloneRepoCap = [int64]$CloneReserveStats[0] + [int64]$CloneReserveStats[1]
 
 $responseList = SantricityGetVolumes -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+if (@($responseList).Count -eq 0) {
+    Write-PrtgError -Message "Failed to retrieve volume inventory from SANtricity"
+    exit 1
+}
+
 $repoVolumeList = SANtricityGetRepoVolumes -responseList $responseList
 $repoCap = [int64](($repoVolumeList.totalSizeInBytes | Measure-Object -Sum).Sum)
 

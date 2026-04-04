@@ -298,6 +298,15 @@ Some related information can be found [here](https://scaleoutsean.github.io/2023
 
 ## Change log
 
+- 2026/04/04
+  - Get-ESeriesPoolInfo.ps1 - improved PS 5.1 baseline reliability with explicit sensor errors for login failures, empty API responses, and unknown pool names
+  - Get-ESeriesSnapCloneRepoInfo.ps1 - corrected storage-system lookup by system ID, fixed clone repo capacity calculation, and improved PS 5.1 error handling
+- 2026/04/04
+  - Get-ESeriesInfo.ps1 - improved PS 5.1 baseline reliability with explicit sensor errors for login and API failures
+  - Get-ESeriesVolumeInfo.ps1 - improved PS 5.1 baseline reliability with explicit sensor errors for login failures, empty API responses, and unknown volume names
+  - Get-ESeriesCGInfo.ps1 - fixed snapshot volume counting, repository summation type safety, and aggregate metric initialization
+  - Get-ESeriesSnapCloneRepoInfo.ps1 - removed hard-coded login defaults from the internal auth helper
+
 - 2023/10/30
   - Get-ESeriesCGInfo.ps1 - initial 1.0.0 release for Consistency Group monitoring
 - 2023/10/12
