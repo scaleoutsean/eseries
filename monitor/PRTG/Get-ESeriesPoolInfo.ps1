@@ -100,8 +100,22 @@ Param (
         Mandatory = $false,
         HelpMessage = 'SANtricity pool name to monitor. Default: none')]
     [ValidateNotNullOrEmpty()]
-    [string]$Pool
+    [string]$Pool,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$UsePowerShell7Wrapper,
+
+    [Parameter(Mandatory = $false)]
+    [string]$PwshPath = 'pwsh',
+
+    [Parameter(Mandatory = $false)]
+    [string]$SantricityModulePath
 )
+
+if ($UsePowerShell7Wrapper) {
+    . (Join-Path -Path $PSScriptRoot -ChildPath 'Invoke-ESeriesPrtgPs7Wrapper.ps1')
+    Invoke-ESeriesPrtgPs7Wrapper -Mode 'pool' -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -Account $Account -Password $Password -Pool $Pool -PwshPath $PwshPath -SantricityModulePath $SantricityModulePath
+}
 
 $ErrorActionPreference = 'Stop'
 

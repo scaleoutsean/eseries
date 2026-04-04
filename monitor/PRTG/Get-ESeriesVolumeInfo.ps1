@@ -101,8 +101,22 @@ Param (
         Mandatory = $true,
         HelpMessage = 'SANtricity volume name to monitor. Default: none')]
     [ValidateNotNullOrEmpty()]
-    [string]$Vol
+    [string]$Vol,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$UsePowerShell7Wrapper,
+
+    [Parameter(Mandatory = $false)]
+    [string]$PwshPath = 'pwsh',
+
+    [Parameter(Mandatory = $false)]
+    [string]$SantricityModulePath
 )
+
+if ($UsePowerShell7Wrapper) {
+    . (Join-Path -Path $PSScriptRoot -ChildPath 'Invoke-ESeriesPrtgPs7Wrapper.ps1')
+    Invoke-ESeriesPrtgPs7Wrapper -Mode 'volume' -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -Account $Account -Password $Password -Vol $Vol -PwshPath $PwshPath -SantricityModulePath $SantricityModulePath
+}
 
 $ErrorActionPreference = 'Stop'
 

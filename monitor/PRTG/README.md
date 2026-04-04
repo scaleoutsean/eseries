@@ -1,4 +1,4 @@
-- [EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80 and PRTG v20-23](#exescript-sensors-for-netapp-e-series-santricity-os-v1180-and-prtg-v20-23)
+- [EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80+ and PRTG v20-23](#exescript-sensors-for-netapp-e-series-santricity-os-v1180-and-prtg-v20-23)
   - [What do these this script do](#what-do-these-this-script-do)
     - [Storage System (Get-ESeriesInfo.ps1)](#storage-system-get-eseriesinfops1)
     - [Volume (Get-ESeriesVolumeInfo.ps1)](#volume-get-eseriesvolumeinfops1)
@@ -27,7 +27,12 @@
   - [Additional information](#additional-information)
   - [Change log](#change-log)
 
-# EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80 and PRTG v20-23
+# EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80+ and PRTG v20-23
+
+- PowerShell 5.1 users:
+  - Since 
+- PowerShell **7** users:
+  - the [wrapper suggestion](https://helpdesk.paessler.com/en/support/solutions/articles/76000073655-powershell) is now implemented
 
 ## What do these this script do
 
@@ -69,6 +74,19 @@ The main use case for this is monitoring of symmetric scale-out workloads such a
 
 EXE/Script sensors in PRTG v20-23 still mandates PowerShell 5.1 (x86), so that's what you must have.
 
+All tracked sensors now support two execution modes:
+
+- Native PowerShell 5.1 mode remains the default and is the safest drop-in path for existing PRTG deployments.
+- Optional wrapper mode keeps the PRTG sensor in PowerShell 5.1, but launches the shared PowerShell 7 backend with `-UsePowerShell7Wrapper`.
+
+Wrapper mode is intended for newer SANtricity releases and code reuse with the PowerShell 7 SANtricity module under [reference/santricity-powershell/santricity](../../reference/santricity-powershell/santricity).
+
+Common wrapper parameters:
+
+- `-UsePowerShell7Wrapper` enables the PowerShell 7 backend.
+- `-PwshPath "C:\Program Files\PowerShell\7\pwsh.exe"` points PRTG to a non-default `pwsh` location when needed.
+- `-SantricityModulePath "C:\Program Files\WindowsPowerShell\Modules\santricity\santricity.psd1"` imports the SANtricity module from an explicit path.
+
 Copy the script(s) to PRTG server's sub-sub-directory for EXEXML sensors:
 
 ![Script copied to PRTG server](/monitor/PRTG/prtg-script-on-server.png)
@@ -93,13 +111,21 @@ This script can be executed from PowerShell 5.1 (x86) like so:
 
 If that works fine (JSON output shows some performance metrics), you can create this EXE/Script sensor and configure it as any other.
 
-From PRTG pass parameters on like this, escaping special characters (`\$`) where necessary: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor\$123"`.
+From PRTG pass parameters on like this, escaping special characters (`\$`) where necessary: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -Account "monitor" -Password "monitor\$123"`.
+
+Wrapper example:
+
+```pwsh
+.\Get-ESeriesInfo.ps1 -ApiEp "192.168.1.0" -ApiPort "8443" `
+  -SanSysId "600a098000f63714000000005e79c17c" -Account "monitor" -Password "monitor$123" `
+  -UsePowerShell7Wrapper -PwshPath "C:\Program Files\PowerShell\7\pwsh.exe"
+```
 
 ### Volume* performance sensor
 
 This script can be used for more than one volume; just create multiple sensors and make them all use the same script. Then name each sensor differently and pass the unique SANtricity volume name in sensor's parameters field.
 
-Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor\$123" -Vol "pgsql"`
+Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -Account "monitor" -Password "monitor\$123" -Vol "pgsql"`
 
 ![Configuring SANtricity volume sensor](/monitor/PRTG/prtg-script-sensor-parameters.png)
 
@@ -109,7 +135,7 @@ It is suggested to monitor just a handful of critical volumes in PRTG and use de
 
 Several pool sensors can share this script. Just specify a different `Pool` in the parameters of each sensor.
 
-Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123" -Pool "bigdata"`
+Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -Account "monitor" -Password "monitor123" -Pool "bigdata"`
 
 ### Snapshot/Clone/Repo sensor
 
@@ -117,7 +143,7 @@ This sensor is very simple. It's there to get people started. Users are encourag
 
 Several arrays share this sensor script. Just specify different parameters.
 
-Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123"`
+Example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -Account "monitor" -Password "monitor123"`
 
 This sensor gives limited metrics on purpose.
 
@@ -133,7 +159,7 @@ Just specify the CG with `-CG`:
     -CG "CG_ELK"
 ```
 
-PRTG example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -User "monitor" -Password "monitor123" -CG "CG_ELK"`
+PRTG example: `-ApiEp "192.168.1.0" -ApiPort "8443" -SanSysId "600a098000f63714000000005eaaabbb" -Account "monitor" -Password "monitor123" -CG "CG_ELK"`
 
 Use multiple sensors for multiple CGs.
 
@@ -299,8 +325,14 @@ Some related information can be found [here](https://scaleoutsean.github.io/2023
 ## Change log
 
 - 2026/04/04
+  - Added optional PowerShell 5.1 to PowerShell 7 wrapper mode for all tracked PRTG sensors.
+  - Added a shared PowerShell 7 backend based on the SANtricity module while preserving existing PRTG JSON sensor schemas.
+  - Documented wrapper parameters and corrected PRTG examples to use `-Account`.
+
+- 2026/04/04
   - Get-ESeriesPoolInfo.ps1 - improved PS 5.1 baseline reliability with explicit sensor errors for login failures, empty API responses, and unknown pool names
   - Get-ESeriesSnapCloneRepoInfo.ps1 - corrected storage-system lookup by system ID, fixed clone repo capacity calculation, and improved PS 5.1 error handling
+
 - 2026/04/04
   - Get-ESeriesInfo.ps1 - improved PS 5.1 baseline reliability with explicit sensor errors for login and API failures
   - Get-ESeriesVolumeInfo.ps1 - improved PS 5.1 baseline reliability with explicit sensor errors for login failures, empty API responses, and unknown volume names

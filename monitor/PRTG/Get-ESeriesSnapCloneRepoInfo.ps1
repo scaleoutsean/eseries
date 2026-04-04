@@ -91,9 +91,23 @@ Param (
         HelpMessage = 'SANtricty password for monitor account')]
     [ValidateNotNullOrEmpty()]
     [ValidateLength(8, 50)]
-    [string]$Password
+    [string]$Password,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$UsePowerShell7Wrapper,
+
+    [Parameter(Mandatory = $false)]
+    [string]$PwshPath = 'pwsh',
+
+    [Parameter(Mandatory = $false)]
+    [string]$SantricityModulePath
 
 )
+
+if ($UsePowerShell7Wrapper) {
+    . (Join-Path -Path $PSScriptRoot -ChildPath 'Invoke-ESeriesPrtgPs7Wrapper.ps1')
+    Invoke-ESeriesPrtgPs7Wrapper -Mode 'snaprepo' -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -Account $Account -Password $Password -PwshPath $PwshPath -SantricityModulePath $SantricityModulePath
+}
 
 $ErrorActionPreference = 'Stop'
 

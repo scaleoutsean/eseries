@@ -101,11 +101,25 @@ Param (
         Mandatory = $true,
         HelpMessage = 'SANtricity CG name to monitor. Default: none. Example: CG_ELK_01')]
     [ValidateNotNullOrEmpty()]
-    [string]$CG
+    [string]$CG,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$UsePowerShell7Wrapper,
+
+    [Parameter(Mandatory = $false)]
+    [string]$PwshPath = 'pwsh',
+
+    [Parameter(Mandatory = $false)]
+    [string]$SantricityModulePath
 
 )
 
-$ErrorActionPreference = 'SilentlyContinue'
+if ($UsePowerShell7Wrapper) {
+    . (Join-Path -Path $PSScriptRoot -ChildPath 'Invoke-ESeriesPrtgPs7Wrapper.ps1')
+    Invoke-ESeriesPrtgPs7Wrapper -Mode 'cg' -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -Account $Account -Password $Password -CG $CG -PwshPath $PwshPath -SantricityModulePath $SantricityModulePath
+}
+
+$ErrorActionPreference = 'Stop'
 
 $Global:headers = New-Object 'System.Collections.Generic.Dictionary[[String],[String]]'
 $headers.Add('Accept', 'application/json')
@@ -181,6 +195,7 @@ Function SantricityLogin {
     $API_ENDPOINT_LOGIN = 'https://' + $ApiEp + ':' + $ApiPort + '/' + 'devmgr/utils/login'
     Try {
         $null = Invoke-RestMethod -Uri $API_ENDPOINT_LOGIN -Method 'POST' -Headers $headers -Body $body -SessionVariable Global:esession
+        return $true
     }
     Catch {
         if ($_.ErrorDetails.Message) {
@@ -189,6 +204,7 @@ Function SantricityLogin {
         else {
             Write-Host $_
         }
+        return $false
     }
 }
 
@@ -224,6 +240,7 @@ Function SantricityGetCGs {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -264,6 +281,7 @@ Function SantricityGetCGMemberVolumes {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -306,6 +324,7 @@ Function SantricityGetCGSnapshots {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -341,6 +360,7 @@ Function SantricityGetSystemSnapshotGroups {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -376,6 +396,7 @@ Function SantricityGetSystemSnapshotVolumes {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -411,6 +432,7 @@ Function SantricityGetSubSystemVolumeMetrics {
         else {
             Write-Host $_
         }
+        return @()
     }
 }
 
@@ -446,7 +468,22 @@ Function SantricityGetVolumes {
         else {
             Write-Host $_
         }
+        return @()
     }
+}
+
+function Write-PrtgError {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    @{
+        "prtg" = @{
+            "error" = 1
+            "text"  = $Message
+        }
+    } | ConvertTo-Json -Depth 3
 }
 
 
@@ -487,19 +524,39 @@ Function SantricityGetSnapshotSchedules {
 #---------------------------------------------------------[Execution]------------------------------------------------------
 
 # login to SANtricity
-SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+$loginOk = SantricityLogin -ApiEp $ApiEp -ApiPort $ApiPort -Account $Account -Password $Password
+if (-not $loginOk) {
+    Write-PrtgError -Message "SANtricity login failed for endpoint ${ApiEp}:$ApiPort"
+    exit 1
+}
 
 # get all volumes on the system
 $SanVolumes = SantricityGetVolumes -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+if (@($SanVolumes).Count -eq 0) {
+    Write-PrtgError -Message "Failed to retrieve volume inventory from SANtricity"
+    exit 1
+}
 
 # get perfomance metrics for all volumes
 $SanVolumeStats = SantricityGetSubSystemVolumeMetrics -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
+if (@($SanVolumeStats).Count -eq 0) {
+    Write-PrtgError -Message "Failed to retrieve volume performance metrics from SANtricity"
+    exit 1
+}
 
 # get list of Consistency Groups from the system
 $SanConsistencyGroups = SantricityGetCGs -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId 
+if (@($SanConsistencyGroups).Count -eq 0) {
+    Write-PrtgError -Message "Failed to retrieve consistency groups from SANtricity"
+    exit 1
+}
 
 # name of CG we're looking for
 $Global:consistencyGroupId = ($SanConsistencyGroups | Where-Object -Property name -EQ $CG).id
+if (-not $consistencyGroupId) {
+    Write-PrtgError -Message "Consistency group '$CG' was not found"
+    exit 1
+}
 
 # get number of CG snapshots used on the system
 $CGSnapshotsUsed = (($SanConsistencyGroups | Where-Object -Property name -EQ $CG).uniqueSequenceNumber).Length
@@ -511,11 +568,9 @@ $SanCGMemberVolumesCount = $SanCGMemberVolumes.Count
 # get list of CG snapshots for our CG
 $SanCGSnapshots = SantricityGetCGSnapshots -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId -CGId $consistencyGroupId
 if ($SanCGSnapshots.Count -lt 1) {
-    $SanCGSnapshotImageCount = 0
     $SanCGSnapshotGroupCount = 0
 }
 else {
-    $SanCGSnapshotImageCount = ($SanCGSnapshots | Select-Object -Property pitTimestamp).Count
     $SanCGSnapshotGroupCount = ($SanCGSnapshots | Select-Object -Property pitTimestamp | Group-Object -Property pitTimestamp).Count
 }
 
@@ -526,11 +581,6 @@ $CgLatestSnapshotAgeHrs = [math]::round((((Get-Date (Get-Date).ToUniversalTime()
 # get list of all clones ("snapshot volumes") on the system and count those that belong to our CG
 $SanSystemSnapshotVolumes = SantricityGetSystemSnapshotVolumes -ApiEp $ApiEp -ApiPort $ApiPort -SanSysId $SanSysId
 $CGSnapshotVolumes = ($SanSystemSnapshotVolumes | Where-Object -Property consistencyGroupId -EQ $consistencyGroupId)
-if (($CGSnapshotVolumes).Count -gt 0) {
-    $SanCGSnapshotVolumeCount = @($CGSnapshotVolumes).Count
-} else { 
-    $SanCGSnapshotVolumeCount = 0
-}
 
 # get repository utilization by CG clones 
 $CGRepositoryUtilizationBytes = 0
