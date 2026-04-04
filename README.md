@@ -1,6 +1,6 @@
 # Various NetApp E-Series SANtricity stuff
 
-Topics that deserve own repositories can be found in own repositories (`santricity-client`, `santricity-go`, etc.).
+Topics that deserve own repositories can be found in own repositories (`santricity-client`, `santricity-go`, `santricity-powershell`, etc.).
 
 ## ansible
 
@@ -13,7 +13,7 @@ Topics that deserve own repositories can be found in own repositories (`santrici
 ## monitor
 
 - Various scripts related to monitoring
-  - PRTG - PowerShell-based scripts that can monitor several SANtricity objects
+  - PRTG - PowerShell-based [scripts that can monitor several SANtricity objects](https://github.com/scaleoutsean/eseries/tree/master/monitor/PRTG)
   - Glances - basic SANtricity monitor (moved to [https://github.com/scaleoutsean/glances/](https://github.com/scaleoutsean/glances/) or maybe even upstream)
 
 Note there stand-alone solutions like [E-Series Perf Analyzer](https://github.com/scaleoutsean/eseries-perf-analyzer) (complex) and [E-Series SANtricity Collector](https://github.com/scaleoutsean/eseries-santricity-collector) (complex).

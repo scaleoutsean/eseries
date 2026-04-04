@@ -1,4 +1,6 @@
 - [EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80+ and PRTG v20-23](#exescript-sensors-for-netapp-e-series-santricity-os-v1180-and-prtg-v20-23)
+  - [PowerShell compatibility](#powershell-compatibility)
+  - [SANtricity compatibility](#santricity-compatibility)
   - [What do these this script do](#what-do-these-this-script-do)
     - [Storage System (Get-ESeriesInfo.ps1)](#storage-system-get-eseriesinfops1)
     - [Volume (Get-ESeriesVolumeInfo.ps1)](#volume-get-eseriesvolumeinfops1)
@@ -29,10 +31,19 @@
 
 # EXE/Script sensors for NetApp E-Series (SANtricity OS) v11.80+ and PRTG v20-23
 
+## PowerShell compatibility 
+
 - PowerShell 5.1 users:
-  - Since 
+  - Since the fixes 2026/04/04, a PS 7 wrapper has been added. PS 5.1 can still work the same way, without a wrapper
 - PowerShell **7** users:
   - the [wrapper suggestion](https://helpdesk.paessler.com/en/support/solutions/articles/76000073655-powershell) is now implemented
+
+## SANtricity compatibility
+
+- 11.90 and 12.00 are both expected to work
+- 11.80 is not actively supported
+
+Let me know if you encounter any issues!
 
 ## What do these this script do
 
