@@ -1,0 +1,32 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/versity/versitygw
+  tag: "latest"
+
+service:
+  type: ClusterIP
+
+auth:
+  accessKey: "admin"
+  secretKey: "password"
+
+gateway:
+  backend:
+    type: posix
+    args: "/mnt/data"
+  port: 7070
+  region: "us-east-1"
+
+# Persistence configuration
+persistence:
+  enabled: true
+  size: 10Gi
+  accessMode: ReadWriteOnce
+  # uncomment and specify the storage class if required:
+  # storageClassName: "standard"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi

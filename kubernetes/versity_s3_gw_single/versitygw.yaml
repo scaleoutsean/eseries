@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: versitygw
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: versitygw-credentials
+  namespace: versitygw
+type: Opaque
+stringData:
+  # Base credentials for S3 access. Change these before deploying.
+  rootAccessKeyId: "admin"
+  rootSecretAccessKey: "password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: versitygw-pvc
+  namespace: versitygw
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # If you need a specific StorageClass (like longhorn, standard, etc.), uncomment and set:
+  # storageClassName: "standard"
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: versitygw
+  namespace: versitygw
+  labels:
+    app: versitygw
+spec:
+  type: ClusterIP
+  ports:
+    - name: s3-api
+      port: 7070
+      targetPort: 7070
+      protocol: TCP
+  selector:
+    app: versitygw
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: versitygw
+  namespace: versitygw
+  labels:
+    app: versitygw
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # Recommended for RWO volumes to detach fully before attach
+  selector:
+    matchLabels:
+      app: versitygw
+  template:
+    metadata:
+      labels:
+        app: versitygw
+    spec:
+      containers:
+        - name: versitygw
+          image: ghcr.io/versity/versitygw:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: s3-api
+              containerPort: 7070
+          env:
+            - name: VGW_BACKEND
+              value: "posix"
+            - name: VGW_BACKEND_ARGS
+              value: "/data"
+            - name: VGW_PORT
+              value: ":7070"
+            # Setting a custom region could be helpful if clients require it
+            - name: VGW_REGION
+              value: "us-east-1"
+            - name: ROOT_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: versitygw-credentials
+                  key: rootAccessKeyId
+            - name: ROOT_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: versitygw-credentials
+                  key: rootSecretAccessKey
+          volumeMounts:
+            - name: storage
+              mountPath: /data
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: versitygw-pvc
