@@ -12,7 +12,7 @@ export AWS_SECRET_ACCESS_KEY="password"
 ENDPOINT="http://localhost:7070"
 
 # List of buckets to create
-BUCKETS=("backup" "velero" "ai")
+BUCKETS=("backup" "velero" "data")
 
 echo "======================================"
 echo "Creating Buckets in Versity S3 Gateway"
