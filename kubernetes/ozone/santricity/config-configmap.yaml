@@ -1,0 +1,48 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config
+data:
+  CORE-SITE.XML_fs.defaultFS: ofs://om/
+  CORE-SITE.XML_fs.trash.interval: "1"
+  CORE-SITE.XML_hadoop.proxyuser.hadoop.groups: '*'
+  CORE-SITE.XML_hadoop.proxyuser.hadoop.hosts: '*'
+  HTTPFS-SITE.XML_httpfs.hadoop.config.dir: /opt/hadoop/etc/config
+  HTTPFS-SITE.XML_httpfs.proxyuser.hadoop.groups: '*'
+  HTTPFS-SITE.XML_httpfs.proxyuser.hadoop.hosts: '*'
+  OZONE-SITE.XML_hdds.datanode.use.datanode.hostname: "true"
+  OZONE-SITE.XML_hdds.datanode.dir: /data/storage
+  OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "3"
+  # OZONE-SITE.XML_hdds.scm.safemode.min.datanode: "1"
+  OZONE-SITE.XML_ozone.datanode.pipeline.limit: "1"
+  OZONE-SITE.XML_hdds.datanode.volume.min.free.space: "1GB"
+  OZONE-SITE.XML_hdds.datanode.volume.choosing.policy: org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy
+  OZONE-SITE.XML_hdds.datanode.du.reserved: "0"
+  OZONE-SITE.XML_ozone.metadata.dirs: /data/metadata
+  OZONE-SITE.XML_ozone.om.address: om-0.om
+  OZONE-SITE.XML_ozone.recon.address: recon-0.recon
+  OZONE-SITE.XML_ozone.scm.block.client.address: scm-0.scm
+  OZONE-SITE.XML_ozone.scm.client.address: scm-0.scm
+  OZONE-SITE.XML_ozone.scm.datanode.id.dir: /data/metadata
+  OZONE-SITE.XML_ozone.scm.names: scm-0.scm
+  LOG4J.PROPERTIES_log4j.rootLogger: INFO, stdout
+  LOG4J.PROPERTIES_log4j.appender.stdout: org.apache.log4j.ConsoleAppender
+  LOG4J.PROPERTIES_log4j.appender.stdout.layout: org.apache.log4j.PatternLayout
+  LOG4J.PROPERTIES_log4j.appender.stdout.layout.ConversionPattern: '%d{yyyy-MM-dd
+    HH:mm:ss} %-5p %c{1}:%L - %m%n'
