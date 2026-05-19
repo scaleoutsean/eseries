@@ -52,5 +52,5 @@ kubectl rollout restart deployment/qdrant -n qdrant
 
 3. Test that index collections are retained.
 
-4. Try taking a backend VolumeSnapshot (using the applicable `VolumeSnapshotClass` targeting `qdrant-pvc-snapshots` or `qdrant-pvc-storage`) to ensure CSI compatibility.
+4. Try taking a backend VolumeSnapshot (using the applicable `VolumeSnapshotClass` targeting `qdrant-pvc-snapshots` or `qdrant-pvc-storage`) to ensure correct CSI functioning.
 
