@@ -9,7 +9,7 @@ It implements several distinct `PersistentVolumeClaims` representing each of the
 - Deployment: Recreate (Ensures robust `ReadWriteOnce` volume detach/attach during rolling restarts).
 - Storage: Maps out to multiple isolated PVCs, using all Qdrant storage consumers (logging, audit, etc.).
 - Network: Exposes Qdrant via `NodePort` mapping `30333` (HTTP) and `30334` (gRPC) by default.
-- TLS: Explicitly disabled (perfect for lab environments without complex certificate handling).
+- TLS: Explicitly disabled (for lab environments without complex certificate handling).
 
 ## PVC Mount Topology
 
@@ -25,9 +25,8 @@ The deployment binds to several directories in the Qdrant container, matching th
 
 - Active Kubernetes cluster
 - Configured [CSI implementation](https://scaleoutsean.github.io/2026/01/20/kubernetes-netapp-eseries-santricity-csi.html) for your target NetApp E-Series storage system. Examples:
-  - SANtricity CSI
-  - IBM Block CSI with SANtricity patch
-- Ensure you have tweaked `./config/local.yaml` as needed (it will be injected into Qdrant as a ConfigMap). 
+  - IBM Block CSI with SANtricity patch (used in this example)
+  - SANtricity CSI (no CSI snapshot feature as of May 2026)
 
 ## Running the Recipe
 
